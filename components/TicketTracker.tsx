@@ -11,6 +11,17 @@ import axios from "axios";
 import { JiraTicket, JiraComment } from "@/types/jira";
 import { toast } from "sonner";
 
+const formatComment = (comment: JiraComment): string => {
+	try {
+		if (!comment.body?.content?.[0]?.content?.[0]?.text) {
+			return "No comment content";
+		}
+		return comment.body.content[0].content[0].text;
+	} catch (error) {
+		return "Unable to display comment content";
+	}
+};
+
 const TicketTracker = () => {
 	const [email, setEmail] = useState("");
 	const [tickets, setTickets] = useState<JiraTicket[]>([]);
@@ -42,17 +53,6 @@ const TicketTracker = () => {
 	const handleSubmit = (e: React.FormEvent) => {
 		e.preventDefault();
 		fetchTickets();
-	};
-
-	const formatComment = (comment: JiraComment): string => {
-		try {
-			if (!comment.body?.content?.[0]?.content?.[0]?.text) {
-				return "No comment content";
-			}
-			return comment.body.content[0].content[0].text;
-		} catch (error) {
-			return "Unable to display comment content";
-		}
 	};
 
 	return (

@@ -1,34 +1,81 @@
-import axios, { AxiosError } from "axios";
+import { IssueResponse, JiraComment, JiraProject, ProjectResponse, PublicTicket, WorkflowTransition } from "@/types/jira";
+import axios, { AxiosInstance, AxiosRequestConfig, AxiosHeaders, AxiosResponse } from "axios";
 
-// Extended interfaces
-export interface JiraProject {
-	id: string;
-	key: string;
-	name: string;
+interface CustomAxiosHeaders extends AxiosHeaders {
+	Authorization?: string;
 }
 
-export interface ProjectResponse {
-	values: JiraProject[];
-}
-
-const jiraApi = axios.create({
-	baseURL: "/api/proxy",
-	headers: {
-		"Content-Type": "application/json",
-	},
+const jiraApi: AxiosInstance = axios.create({
+	baseURL: process.env.NEXT_PUBLIC_JIRA_URL || "",
 });
 
-// Call this when your app initializes
+(jiraApi.defaults.headers as unknown) = {
+	"X-Requested-With": "XMLHttpRequest",
+} as unknown as CustomAxiosHeaders;
+
+export const setJiraAuthHeader = (apiToken: string) => {
+	(jiraApi.defaults.headers as unknown) = {
+		...(jiraApi.defaults.headers as unknown as CustomAxiosHeaders),
+		Authorization: `Basic ${Buffer.from(`${process.env.NEXT_PUBLIC_JIRA_EMAIL}:${apiToken}`).toString("base64")}`,
+	} as CustomAxiosHeaders;
+};
+
+export const removeJiraAuthHeader = () => {
+	delete jiraApi.defaults.headers.Authorization;
+};
+
+const requestHandler = async (config: AxiosRequestConfig) => {
+	if (!jiraApi.defaults.headers.Authorization) {
+		throw new Error("JIRA API token not set");
+	}
+	return jiraApi(config);
+};
+
+const authenticateAndAddComment = async (issueKey: string, comment: string): Promise<void> => {
+	try {
+		const headers = jiraApi.defaults.headers as unknown as CustomAxiosHeaders;
+		// Ensure headers is properly structured for Axios request
+		Object.assign(headers, {
+			Authorization: `Bearer ${process.env.JIRA_API_TOKEN}`, // Example of adding necessary headers
+			Accept: "application/json",
+			"User-Agent": "axios/0.21.4", // Adapt as necessary
+		});
+
+		const response: AxiosResponse = await jiraApi.get("/rest/auth/1/session");
+
+		console.log(response.data);
+	} catch (error) {
+		console.error("Error authenticating and adding comment:", error);
+	}
+};
+
+export const testConnection = async () => {
+	try {
+		const response = await jiraApi.get("/api/proxy/rest/api/3/myself");
+		console.log("Connection test successful:", response.data);
+		return response.data;
+	} catch (error) {
+		console.error("Connection test failed:", error);
+		throw error;
+	}
+};
+
 export const initializeJiraApi = (email: string, apiToken: string) => {
 	const base64Credentials = btoa(`${email}:${apiToken}`);
 	jiraApi.defaults.headers["Authorization"] = `Basic ${base64Credentials}`;
+
+	// Log the headers (without showing the full token)
+	console.log("JIRA API initialized with headers:", {
+		...jiraApi.defaults.headers,
+		Authorization: "Basic [hidden]",
+	});
 };
 
 // Function to get available projects
 export const getProjects = async (): Promise<JiraProject[]> => {
 	try {
 		console.log("Fetching projects - current headers:", jiraApi.defaults.headers);
-		const response = await jiraApi.get<ProjectResponse>("/rest/api/3/project/search");
+		const response = await jiraApi.get<ProjectResponse>("/api/proxy/rest/api/3/project/search");
 		console.log("Raw projects response:", response.data);
 		return response.data.values;
 	} catch (error) {
@@ -47,60 +94,12 @@ export const getProjects = async (): Promise<JiraProject[]> => {
 	}
 };
 
-export interface JiraIssue {
-	id: string;
-	key: string;
-	fields: {
-		summary: string;
-		description: any;
-		status: {
-			name: string;
-		};
-		created: string;
-		updated: string;
-	};
-}
-
-export interface IssueResponse {
-	issues: JiraIssue[];
-	total: number;
-}
-export interface JiraComment {
-	id: string;
-	body: {
-		content: any[];
-	};
-	author: {
-		displayName: string;
-		emailAddress: string;
-	};
-	created: string;
-}
-
-export interface WorkflowTransition {
-	id: string;
-	name: string;
-	to: {
-		name: string;
-	};
-}
-
-export interface PublicTicket {
-	key: string;
-	summary: string;
-	description: string;
-	status: string;
-	created: string;
-	updated: string;
-	comments: JiraComment[];
-}
-
 // Existing credential setup function
 // Check if a project exists
 export const checkProject = async (projectKey: string): Promise<boolean> => {
 	try {
 		console.log("Checking project:", projectKey);
-		const response = await jiraApi.get(`/rest/api/3/project/${projectKey}`);
+		const response = await jiraApi.get(`/api/proxy/rest/api/3/project/${projectKey}`);
 		console.log("Project exists:", response.data);
 		return true;
 	} catch (error) {
@@ -116,7 +115,7 @@ export const checkProject = async (projectKey: string): Promise<boolean> => {
 // List all accessible projects
 export const listProjects = async (): Promise<void> => {
 	try {
-		const response = await jiraApi.get("/rest/api/3/project");
+		const response = await jiraApi.get("/api/proxy/rest/api/3/project");
 		console.log("Available projects:");
 		response.data.forEach((project: any) => {
 			console.log(`- ${project.key}: ${project.name}`);
@@ -130,6 +129,28 @@ export const listProjects = async (): Promise<void> => {
 	}
 };
 
+// Function to create a new issue
+export const createIssue = async (projectKey: string, summary: string, description: string): Promise<IssueResponse> => {
+	try {
+		const response = await jiraApi.post(`/api/proxy/rest/api/3/issue`, {
+			fields: {
+				project: {
+					key: projectKey,
+				},
+				summary,
+				description,
+				issuetype: {
+					name: "Story",
+				},
+			},
+		});
+		return response.data;
+	} catch (error) {
+		console.error("Error creating issue:", error);
+		throw error;
+	}
+};
+
 // Test JQL query directly
 export const testJqlQuery = async (jql: string): Promise<any> => {
 	try {
@@ -137,7 +158,7 @@ export const testJqlQuery = async (jql: string): Promise<any> => {
 		console.log("Testing JQL query:", jql);
 		console.log("Encoded JQL:", encodedJql);
 
-		const response = await jiraApi.get("/rest/api/3/search", {
+		const response = await jiraApi.get("/api/proxy/rest/api/3/search", {
 			params: {
 				jql,
 				maxResults: 1, // Just get one result for testing
@@ -162,7 +183,7 @@ export const testJqlQuery = async (jql: string): Promise<any> => {
 // Function to fetch all issues
 export const fetchIssues = async (): Promise<any[]> => {
 	try {
-		const response = await jiraApi.get<IssueResponse>("/rest/api/2/search", {
+		const response = await jiraApi.get<IssueResponse>("/api/proxy/rest/api/3/search", {
 			params: {
 				// Replace YOUR_PROJECT_KEY with the actual project key from your JIRA instance
 				jql: "project = TADTECHJC ORDER BY created DESC",
@@ -193,7 +214,7 @@ export const setJiraCredentials = (email: string, apiToken: string) => {
 // New function to get available transitions for an issue
 export const getAvailableTransitions = async (issueKey: string): Promise<WorkflowTransition[]> => {
 	try {
-		const response = await jiraApi.get(`/rest/api/3/issue/${issueKey}/transitions`);
+		const response = await jiraApi.get(`/api/proxy/rest/api/3/issue/${issueKey}/transitions`);
 		return response.data.transitions;
 	} catch (error) {
 		console.error("Error fetching transitions:", error);
@@ -204,7 +225,7 @@ export const getAvailableTransitions = async (issueKey: string): Promise<Workflo
 // Function to transition an issue
 export const transitionIssue = async (issueKey: string, transitionId: string): Promise<void> => {
 	try {
-		await jiraApi.post(`/rest/api/3/issue/${issueKey}/transitions`, {
+		await jiraApi.post(`/api/proxy/rest/api/3/issue/${issueKey}/transitions`, {
 			transition: { id: transitionId },
 		});
 	} catch (error) {
@@ -216,7 +237,14 @@ export const transitionIssue = async (issueKey: string, transitionId: string): P
 // Function to add a comment to an issue
 export const addComment = async (issueKey: string, comment: string): Promise<JiraComment> => {
 	try {
-		const response = await jiraApi.post(`/rest/api/3/issue/${issueKey}/comment`, {
+		// Log the request details (for debugging)
+		console.log("Adding comment to issue:", issueKey);
+		console.log("Current headers:", {
+			...jiraApi.defaults.headers,
+			Authorization: "Basic [hidden]",
+		});
+
+		const response = await jiraApi.post(`/api/proxy/rest/api/3/issue/${issueKey}/comment`, {
 			body: {
 				type: "doc",
 				version: 1,
@@ -228,9 +256,19 @@ export const addComment = async (issueKey: string, comment: string): Promise<Jir
 				],
 			},
 		});
+
 		return response.data;
 	} catch (error) {
 		console.error("Error adding comment:", error);
+		if (axios.isAxiosError(error)) {
+			console.error("Response status:", error.response?.status);
+			console.error("Response data:", error.response?.data);
+			console.error("Request URL:", error.config?.url);
+			console.error("Request headers:", {
+				...error.config?.headers,
+				Authorization: "Basic [hidden]",
+			});
+		}
 		throw error;
 	}
 };
@@ -238,7 +276,7 @@ export const addComment = async (issueKey: string, comment: string): Promise<Jir
 // Function to get comments for an issue
 export const getComments = async (issueKey: string): Promise<JiraComment[]> => {
 	try {
-		const response = await jiraApi.get(`/rest/api/3/issue/${issueKey}/comment`);
+		const response = await jiraApi.get(`/api/proxy/rest/api/3/issue/${issueKey}/comment`);
 		return response.data.comments;
 	} catch (error) {
 		console.error("Error fetching comments:", error);
@@ -298,3 +336,6 @@ export const getIssueDetails = async (issueKey: string): Promise<any> => {
 		throw error;
 	}
 };
+export type { PublicTicket };
+
+export type { WorkflowTransition, JiraComment };
