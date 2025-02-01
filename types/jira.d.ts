@@ -46,14 +46,38 @@ export interface JiraIssue {
 	id: string;
 	key: string;
 	fields: {
+		assignee: JiraAssignee;
+		comment: JiraComment[];
 		summary: string;
-		description: any;
+		description?: JiraDescriptionPayload;
 		status: {
 			name: string;
 		};
 		created: string;
 		updated: string;
 	};
+}
+
+export interface JiraTextElement {
+	type: "text";
+	text: string;
+}
+
+export interface JiraContentBlock {
+	type: string;
+	content: JiraTextElement[];
+}
+
+export interface JiraDescriptionPayload {
+	type: "doc";
+	version: number;
+	content: JiraContentBlock[];
+}
+
+export interface JiraAssignee {
+	accountId: string;
+	displayName: string;
+	emailAddress: string;
 }
 
 export interface IssueResponse {

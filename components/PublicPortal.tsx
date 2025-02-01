@@ -1,3 +1,4 @@
+// components/PublicPortal.tsx
 "use client";
 
 import { useState } from "react";
@@ -8,7 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { createPublicTicket, getPublicTicketStatus, PublicTicket } from "@/lib/jira-api";
+import { toast } from "sonner";
+import { createPublicTicket, getPublicTicketStatus, PublicTicket, addComment } from "@/lib/jira-api";
 
 export default function PublicPortal() {
 	const [newTicket, setNewTicket] = useState({
@@ -21,6 +23,7 @@ export default function PublicPortal() {
 	const [ticketDetails, setTicketDetails] = useState<PublicTicket | null>(null);
 	const [error, setError] = useState("");
 	const [success, setSuccess] = useState("");
+	const [newComment, setNewComment] = useState("");
 
 	const handleSubmitTicket = async () => {
 		try {
@@ -56,6 +59,30 @@ export default function PublicPortal() {
 			setTicketDetails(details);
 		} catch (error) {
 			setError("Failed to fetch ticket details. Please verify your information.");
+		}
+	};
+
+	const loadTicketDetails = async (email: string) => {
+		try {
+			const details = await getPublicTicketStatus(ticketKey, email);
+			setTicketDetails(details);
+		} catch (error) {
+			setError("Failed to refresh ticket details");
+		}
+	};
+
+	const handleSubmitComment = async (e: React.FormEvent) => {
+		e.preventDefault();
+		try {
+			if (!ticketKey || !newComment) return;
+
+			await addComment(ticketKey, newComment);
+			setNewComment("");
+			toast.success("Comment added successfully!");
+			loadTicketDetails(searchEmail); // Refresh ticket details
+		} catch (error) {
+			console.error("Error adding comment:", error);
+			setError("Failed to add comment");
 		}
 	};
 

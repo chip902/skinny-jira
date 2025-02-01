@@ -1,3 +1,4 @@
+// lib/jira-api.ts
 import { IssueResponse, JiraComment, JiraProject, ProjectResponse, PublicTicket, WorkflowTransition } from "@/types/jira";
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosHeaders, AxiosResponse } from "axios";
 
@@ -6,7 +7,7 @@ interface CustomAxiosHeaders extends AxiosHeaders {
 }
 
 const jiraApi: AxiosInstance = axios.create({
-	baseURL: process.env.NEXT_PUBLIC_JIRA_URL || "",
+	baseURL: "",
 });
 
 (jiraApi.defaults.headers as unknown) = {
@@ -36,7 +37,7 @@ const authenticateAndAddComment = async (issueKey: string, comment: string): Pro
 		const headers = jiraApi.defaults.headers as unknown as CustomAxiosHeaders;
 		// Ensure headers is properly structured for Axios request
 		Object.assign(headers, {
-			Authorization: `Bearer ${process.env.JIRA_API_TOKEN}`, // Example of adding necessary headers
+			Authorization: `Bearer ${process.env.JIRA_API_TOKEN}`,
 			Accept: "application/json",
 			"User-Agent": "axios/0.21.4", // Adapt as necessary
 		});
@@ -185,7 +186,6 @@ export const fetchIssues = async (): Promise<any[]> => {
 	try {
 		const response = await jiraApi.get<IssueResponse>("/api/proxy/rest/api/3/search", {
 			params: {
-				// Replace YOUR_PROJECT_KEY with the actual project key from your JIRA instance
 				jql: "project = TADTECHJC ORDER BY created DESC",
 				fields: "summary,description,status,created,updated",
 			},
@@ -315,21 +315,27 @@ export const getPublicTicketStatus = async (ticketKey: string, email: string): P
 // Function to watch an issue
 export const watchIssue = async (issueKey: string): Promise<void> => {
 	try {
-		await jiraApi.post(`/rest/api/3/issue/${issueKey}/watchers`);
+		await jiraApi.post(`/api/proxy/rest/api/3/issue/${issueKey}/watchers`);
 	} catch (error) {
 		console.error("Error watching issue:", error);
 		throw error;
 	}
 };
 
+export async function updateIssue(issueKey: string, updates: object) {
+	const response = await jiraApi.put(`/rest/api/3/issue/${issueKey}`, updates);
+	return response.data;
+}
+
 // Function to get issue details including status and comments
 export const getIssueDetails = async (issueKey: string): Promise<any> => {
 	try {
-		const response = await jiraApi.get(`/rest/api/3/issue/${issueKey}`, {
+		const response = await jiraApi.get(`/api/proxy/rest/api/3/issue/${issueKey}`, {
 			params: {
-				fields: "summary,description,status,comment,created,updated",
+				fields: "summary,assignee,description,status,comment,created,updated",
 			},
 		});
+		console.log("CHIP DEBUG: ", response);
 		return response.data;
 	} catch (error) {
 		console.error("Error fetching issue details:", error);
@@ -339,3 +345,4 @@ export const getIssueDetails = async (issueKey: string): Promise<any> => {
 export type { PublicTicket };
 
 export type { WorkflowTransition, JiraComment };
+export type { JiraProject };

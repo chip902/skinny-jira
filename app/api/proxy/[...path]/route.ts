@@ -1,3 +1,4 @@
+// app/api/proxy/[...path]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 
 async function handler(req: NextRequest) {

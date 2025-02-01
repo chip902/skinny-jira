@@ -19,7 +19,7 @@ const jiraRequestHandler = async (options: { method: string; url: string; data?:
 	}
 
 	try {
-		const response = await jiraApi[options.method](options.url, options.data);
+		const response = await jiraApi.get(options.url, options.data);
 		return response.data;
 	} catch (error) {
 		console.error("Error in JIRA request:", error);

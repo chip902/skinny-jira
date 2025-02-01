@@ -1,6 +1,9 @@
+// app/issues/page.tsx
 "use client";
+export const dynamic = "error";
 
 import { useState, useEffect } from "react";
+import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,20 +19,21 @@ import {
 	testJqlQuery,
 	initializeJiraApi,
 } from "@/lib/jira-api";
+import { JiraIssue } from "@/types/jira";
 
-interface Issue {
-	key: string;
-	id: string;
-	summary: string;
-	description: any;
-	status: string;
-	created: string;
-	updated: string;
+function DateDisplay({ isoString }: { isoString: string }) {
+	const [formatted, setFormatted] = useState("");
+
+	useEffect(() => {
+		setFormatted(new Date(isoString).toLocaleString());
+	}, [isoString]);
+
+	return <span>{formatted || "Loading date..."}</span>;
 }
 
 export default function IssueManagement() {
-	const [issues, setIssues] = useState<Issue[]>([]);
-	const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
+	const [issues, setIssues] = useState<JiraIssue[]>([]);
+	const [selectedIssue, setSelectedIssue] = useState<JiraIssue | null>(null);
 	const [transitions, setTransitions] = useState<WorkflowTransition[]>([]);
 	const [comments, setComments] = useState<JiraComment[]>([]);
 	const [newComment, setNewComment] = useState("");
@@ -37,23 +41,17 @@ export default function IssueManagement() {
 	const [error, setError] = useState("");
 
 	useEffect(() => {
-		// Initialize JIRA API when component mounts
-		initializeJiraApi(process.env.NEXT_PUBLIC_JIRA_EMAIL!, process.env.NEXT_PUBLIC_JIRA_TOKEN!);
-		loadIssues();
-	}, []);
+		async function onMount() {
+			// init JIRA
+			initializeJiraApi(process.env.NEXT_PUBLIC_JIRA_EMAIL!, process.env.NEXT_PUBLIC_JIRA_TOKEN!);
 
-	useEffect(() => {
-		async function testQuery() {
-			try {
-				// Use the same project key here
-				await testJqlQuery('project = "TADTECHJC"');
-				loadIssues();
-			} catch (error) {
-				console.error("JQL test failed:", error);
-				setError("true");
-			}
+			// test query
+			await testJqlQuery('project = "TADTECHJC"');
+			// then load issues
+			await loadIssues();
 		}
-		testQuery();
+
+		onMount().catch((err) => console.error(err));
 	}, []);
 	useEffect(() => {
 		if (selectedIssue) {
@@ -88,10 +86,27 @@ export default function IssueManagement() {
 
 			setTransitions(transitionsData);
 			setComments(commentsData);
-			setSelectedIssue({
-				...selectedIssue,
-				status: details.fields.status.name,
-				description: details.fields.description,
+			setSelectedIssue((prevState) => {
+				if (!details) {
+					return prevState;
+				}
+				const newIssue = {
+					id: details.id,
+					key: details.key,
+					fields: {
+						assignee: details.fields.assignee,
+						comment: details.fields.comment,
+						summary: details.fields.summary,
+						description: details.fields.description,
+						status: {
+							name: details.status?.name || "Not Available",
+						},
+						created: details.fields.created,
+						updated: details.fields.updated,
+					},
+				};
+
+				return prevState ? { ...prevState, ...newIssue } : newIssue;
 			});
 		} catch (error) {
 			setError("Failed to load issue details");
@@ -152,9 +167,9 @@ export default function IssueManagement() {
 									<div className="flex justify-between items-center">
 										<div>
 											<p className="font-medium">{issue.key}</p>
-											<p className="text-sm text-muted-foreground">{issue.summary}</p>
+											<p className="text-sm text-muted-foreground">{issue.fields.summary}</p>
 										</div>
-										<span className="px-2 py-1 text-xs rounded-full bg-primary/10">{issue.status}</span>
+										<span className="px-2 py-1 text-xs rounded-full bg-primary/10">{issue.fields.status.name}</span>
 									</div>
 								</div>
 							))}
@@ -170,7 +185,7 @@ export default function IssueManagement() {
 						<CardContent>
 							<div className="space-y-6">
 								<div>
-									<h3 className="text-lg font-semibold mb-2">Status: {selectedIssue.status}</h3>
+									<h3 className="text-lg font-semibold mb-2">Status: {}</h3>
 									{transitions.length > 0 && (
 										<div className="flex gap-2">
 											{transitions.map((transition) => (
@@ -187,12 +202,29 @@ export default function IssueManagement() {
 								</div>
 
 								<div>
+									<h3 className="text-lg font-semibold mb-2">Summary</h3>
+									<p className="text-sm text-muted-foreground">{selectedIssue.fields.summary}</p>
+								</div>
+								<div>
+									<h3 className="text-lg font-semibold mb-2">Assigned To</h3>
+									<p className="text-sm text-muted-foreground">{selectedIssue.fields.assignee.displayName}</p>
+								</div>
+								<div>
+									<h3 className="text-lg font-semibold mb-2">Created</h3>
+									<p className="text-sm text-muted-foreground">{format(new Date(selectedIssue.fields.created), "yyyy-MM-dd HH:mm:ss")}</p>
+								</div>
+
+								<div>
+									<h3 className="text-lg font-semibold mb-2">Updated</h3>
+									<p className="text-sm text-muted-foreground">{format(new Date(selectedIssue.fields.updated), "yyyy-MM-dd HH:mm:ss")}</p>
+								</div>
+								<div>
 									<h3 className="text-lg font-semibold mb-2">Comments</h3>
 									<div className="space-y-4 mb-4">
 										{comments.map((comment) => (
 											<div key={comment.id} className="border-l-2 border-primary/20 pl-4">
 												<p className="text-sm text-muted-foreground">
-													{comment.author.displayName} - {new Date(comment.created).toLocaleString()}
+													{comment.author.displayName} - {format(new Date(comment.created), "yyyy-MM-dd HH:mm:ss")}
 												</p>
 												<p className="mt-1">{comment.body.content[0].content[0].text}</p>
 											</div>

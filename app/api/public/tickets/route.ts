@@ -1,3 +1,4 @@
+// app/api/public/tickets/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import axios from "axios";
 
@@ -36,7 +37,7 @@ export async function GET(req: NextRequest) {
 		const jql = `reporter = "${email}"`;
 		console.log("Executing JQL query:", jql);
 
-		const response = await jiraClient.get("/rest/api/2/search", {
+		const response = await jiraClient.get("/api/proxy/rest/api/2/search", {
 			params: {
 				jql,
 				fields: "summary,description,status,created,updated,comment",
@@ -109,7 +110,7 @@ export async function POST(req: NextRequest) {
 
 		const jiraClient = createJiraClient();
 
-		const createResponse = await jiraClient.post("/rest/api/2/issue", {
+		const createResponse = await jiraClient.post("/api/proxy/rest/api/2/issue", {
 			fields: {
 				project: {
 					key: process.env.JIRA_PROJECT_KEY,
@@ -138,7 +139,7 @@ export async function POST(req: NextRequest) {
 
 		// Add watcher
 		try {
-			await jiraClient.post(`/rest/api/2/issue/${issueKey}/watchers`, `"${email}"`, {
+			await jiraClient.post(`/api/proxy/rest/api/2/issue/${issueKey}/watchers`, `"${email}"`, {
 				headers: {
 					"Content-Type": "application/json",
 				},

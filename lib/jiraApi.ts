@@ -1,3 +1,4 @@
+// lib/jiraApi.ts
 import axios, { AxiosError, AxiosRequestConfig } from "axios";
 
 const jiraApi = axios.create({
