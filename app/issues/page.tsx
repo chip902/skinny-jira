@@ -20,6 +20,7 @@ import {
 	initializeJiraApi,
 } from "@/lib/jira-api";
 import { JiraIssue } from "@/types/jira";
+import { Skeleton } from "@/components/ui/skeleton";
 
 function DateDisplay({ isoString }: { isoString: string }) {
 	const [formatted, setFormatted] = useState("");
@@ -38,6 +39,7 @@ export default function IssueManagement() {
 	const [comments, setComments] = useState<JiraComment[]>([]);
 	const [newComment, setNewComment] = useState("");
 	const [loading, setLoading] = useState(false);
+	const [detailsLoading, setDetailsLoading] = useState(false);
 	const [error, setError] = useState("");
 
 	useEffect(() => {
@@ -77,7 +79,7 @@ export default function IssueManagement() {
 		if (!selectedIssue) return;
 
 		try {
-			setLoading(true);
+			setDetailsLoading(true);
 			const [transitionsData, commentsData, details] = await Promise.all([
 				getAvailableTransitions(selectedIssue.key),
 				getComments(selectedIssue.key),
@@ -112,7 +114,7 @@ export default function IssueManagement() {
 			setError("Failed to load issue details");
 			console.error("Error loading issue details:", error);
 		} finally {
-			setLoading(false);
+			setDetailsLoading(false);
 		}
 	};
 
@@ -159,20 +161,39 @@ export default function IssueManagement() {
 					</CardHeader>
 					<CardContent>
 						<div className="space-y-4">
-							{issues.map((issue) => (
-								<div
-									key={issue.id}
-									className={`p-4 border rounded-lg cursor-pointer hover:bg-accent ${selectedIssue?.id === issue.id ? "bg-accent" : ""}`}
-									onClick={() => setSelectedIssue(issue)}>
-									<div className="flex justify-between items-center">
-										<div>
-											<p className="font-medium">{issue.key}</p>
-											<p className="text-sm text-muted-foreground">{issue.fields.summary}</p>
+							{loading ? (
+								<>
+									{[1, 2, 3].map((i) => (
+										<div key={i} className="p-4 border rounded-lg">
+											<div className="space-y-2">
+												<Skeleton className="h-4 w-[100px]" />
+												<Skeleton className="h-4 w-[200px]" />
+											</div>
 										</div>
-										<span className="px-2 py-1 text-xs rounded-full bg-primary/10">{issue.fields.status.name}</span>
+									))}
+								</>
+							) : (
+								issues.map((issue) => (
+									<div
+										key={issue.id}
+										className={`p-4 border rounded-lg cursor-pointer hover:bg-accent ${selectedIssue?.id === issue.id ? "bg-accent" : ""}`}
+										onClick={() => setSelectedIssue(issue)}>
+										<div className="flex justify-between items-center">
+											<div>
+												{issue.key && (
+													<>
+														<p className="font-medium">{issue.key}</p>
+														<p className="text-sm text-muted-foreground">{issue.fields.summary || "No summary available"}</p>
+													</>
+												)}
+											</div>
+											<span className="px-2 py-1 text-xs rounded-full bg-primary/10">
+												{issue.fields.status.name || "No status available"}
+											</span>
+										</div>
 									</div>
-								</div>
-							))}
+								))
+							)}
 						</div>
 					</CardContent>
 				</Card>
@@ -183,62 +204,97 @@ export default function IssueManagement() {
 							<CardTitle>Issue Details: {selectedIssue.key}</CardTitle>
 						</CardHeader>
 						<CardContent>
-							<div className="space-y-6">
-								<div>
-									<h3 className="text-lg font-semibold mb-2">Status: {}</h3>
-									{transitions.length > 0 && (
-										<div className="flex gap-2">
-											{transitions.map((transition) => (
-												<Button
-													key={transition.id}
-													variant="outline"
-													onClick={() => handleTransition(transition.id)}
-													disabled={loading}>
-													{transition.name}
-												</Button>
+							{detailsLoading ? (
+								// Skeleton loading state
+								<div className="space-y-6">
+									<div>
+										<Skeleton className="h-6 w-[100px] mb-2" />
+										<Skeleton className="h-10 w-full" />
+									</div>
+									<div>
+										<Skeleton className="h-6 w-[100px] mb-2" />
+										<Skeleton className="h-4 w-[300px]" />
+									</div>
+									<div>
+										<Skeleton className="h-6 w-[100px] mb-2" />
+										<Skeleton className="h-4 w-[200px]" />
+									</div>
+									<div>
+										<Skeleton className="h-6 w-[100px] mb-2" />
+										<div className="space-y-2">
+											{[1, 2].map((i) => (
+												<Skeleton key={i} className="h-20 w-full" />
 											))}
 										</div>
-									)}
+									</div>
 								</div>
-
-								<div>
-									<h3 className="text-lg font-semibold mb-2">Summary</h3>
-									<p className="text-sm text-muted-foreground">{selectedIssue.fields.summary}</p>
-								</div>
-								<div>
-									<h3 className="text-lg font-semibold mb-2">Assigned To</h3>
-									<p className="text-sm text-muted-foreground">{selectedIssue.fields.assignee.displayName}</p>
-								</div>
-								<div>
-									<h3 className="text-lg font-semibold mb-2">Created</h3>
-									<p className="text-sm text-muted-foreground">{format(new Date(selectedIssue.fields.created), "yyyy-MM-dd HH:mm:ss")}</p>
-								</div>
-
-								<div>
-									<h3 className="text-lg font-semibold mb-2">Updated</h3>
-									<p className="text-sm text-muted-foreground">{format(new Date(selectedIssue.fields.updated), "yyyy-MM-dd HH:mm:ss")}</p>
-								</div>
-								<div>
-									<h3 className="text-lg font-semibold mb-2">Comments</h3>
-									<div className="space-y-4 mb-4">
-										{comments.map((comment) => (
-											<div key={comment.id} className="border-l-2 border-primary/20 pl-4">
-												<p className="text-sm text-muted-foreground">
-													{comment.author.displayName} - {format(new Date(comment.created), "yyyy-MM-dd HH:mm:ss")}
-												</p>
-												<p className="mt-1">{comment.body.content[0].content[0].text}</p>
+							) : (
+								// Actual content
+								<div className="space-y-6">
+									<div>
+										<h3 className="text-lg font-semibold mb-2">Status: {}</h3>
+										{transitions.length > 0 && (
+											<div className="flex gap-2">
+												{transitions.map((transition) => (
+													<Button
+														key={transition.id}
+														variant="outline"
+														onClick={() => handleTransition(transition.id)}
+														disabled={loading}>
+														{transition.name}
+													</Button>
+												))}
 											</div>
-										))}
+										)}
 									</div>
 
-									<div className="space-y-2">
-										<Textarea placeholder="Add a comment..." value={newComment} onChange={(e) => setNewComment(e.target.value)} />
-										<Button onClick={handleAddComment} disabled={loading || !newComment.trim()}>
-											Add Comment
-										</Button>
+									<div>
+										<h3 className="text-lg font-semibold mb-2">Summary</h3>
+										<p className="text-sm text-muted-foreground">{selectedIssue?.fields?.summary}</p>
+									</div>
+									<div>
+										<h3 className="text-lg font-semibold mb-2">Assigned To</h3>
+										<p className="text-sm text-muted-foreground">{selectedIssue.fields?.assignee?.displayName}</p>
+									</div>
+									<div>
+										<h3 className="text-lg font-semibold mb-2">Created</h3>
+										<p className="text-sm text-muted-foreground">
+											{selectedIssue.fields?.created
+												? format(new Date(selectedIssue.fields.created.replace("+0000", "Z")), "yyyy-MM-dd HH:mm:ss")
+												: "N/A"}
+										</p>
+									</div>
+
+									<div>
+										<h3 className="text-lg font-semibold mb-2">Updated</h3>
+										<p className="text-sm text-muted-foreground">
+											{selectedIssue.fields?.updated
+												? format(new Date(selectedIssue.fields.updated.replace("+0000", "Z")), "yyyy-MM-dd HH:mm:ss")
+												: "N/A"}
+										</p>
+									</div>
+									<div>
+										<h3 className="text-lg font-semibold mb-2">Comments</h3>
+										<div className="space-y-4 mb-4">
+											{comments.map((comment) => (
+												<div key={comment.id} className="border-l-2 border-primary/20 pl-4">
+													<p className="text-sm text-muted-foreground">
+														{comment.author.displayName} - {format(new Date(comment.created), "yyyy-MM-dd HH:mm:ss")}
+													</p>
+													<p className="mt-1">{comment.body.content[0].content[0].text}</p>
+												</div>
+											))}
+										</div>
+
+										<div className="space-y-2">
+											<Textarea placeholder="Add a comment..." value={newComment} onChange={(e) => setNewComment(e.target.value)} />
+											<Button onClick={handleAddComment} disabled={loading || !newComment.trim()}>
+												Add Comment
+											</Button>
+										</div>
 									</div>
 								</div>
-							</div>
+							)}
 						</CardContent>
 					</Card>
 				)}

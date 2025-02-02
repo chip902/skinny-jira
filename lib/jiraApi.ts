@@ -14,10 +14,21 @@ export const removeJiraAuthHeader = () => {
 };
 
 const requestHandler = async (config: AxiosRequestConfig) => {
-	if (!jiraApi.defaults.headers.Authorization) {
-		throw new Error("JIRA API token not set");
+	try {
+		if (!jiraApi.defaults.headers.Authorization) {
+			throw new Error("JIRA API token not set");
+		}
+		const response = await jiraApi(config);
+		return response.data;
+	} catch (error) {
+		if (error instanceof AxiosError) {
+			console.error("API request failed:", error.message);
+			throw error;
+		} else {
+			console.error("Unexpected error:", error);
+			throw error;
+		}
 	}
-	return jiraApi(config);
 };
 
 export const fetchIssues = async () =>

@@ -7,7 +7,7 @@ interface CustomAxiosHeaders extends AxiosHeaders {
 }
 
 const jiraApi: AxiosInstance = axios.create({
-	baseURL: "",
+	baseURL: "/",
 });
 
 (jiraApi.defaults.headers as unknown) = {
@@ -153,16 +153,21 @@ export const createIssue = async (projectKey: string, summary: string, descripti
 };
 
 // Test JQL query directly
+// In jira-api.ts
 export const testJqlQuery = async (jql: string): Promise<any> => {
 	try {
 		const encodedJql = encodeURIComponent(jql);
 		console.log("Testing JQL query:", jql);
 		console.log("Encoded JQL:", encodedJql);
+		console.log("Current headers:", {
+			...jiraApi.defaults.headers,
+			Authorization: "Basic [hidden]",
+		});
 
 		const response = await jiraApi.get("/api/proxy/rest/api/3/search", {
 			params: {
 				jql,
-				maxResults: 1, // Just get one result for testing
+				maxResults: 1,
 			},
 			paramsSerializer: {
 				encode: encodeURIComponent,
@@ -176,6 +181,8 @@ export const testJqlQuery = async (jql: string): Promise<any> => {
 		if (axios.isAxiosError(error)) {
 			console.error("URL:", error.config?.url);
 			console.error("Response:", error.response?.data);
+			console.error("Status:", error.response?.status);
+			console.error("Headers:", error.config?.headers);
 		}
 		throw error;
 	}
@@ -190,15 +197,20 @@ export const fetchIssues = async (): Promise<any[]> => {
 				fields: "summary,description,status,created,updated",
 			},
 		});
+		console.log("Jira API Response:", response); // Log the raw response
 
 		return response.data.issues.map((issue) => ({
 			id: issue.id,
 			key: issue.key,
-			summary: issue.fields.summary,
-			description: issue.fields.description,
-			status: issue.fields.status.name,
-			created: issue.fields.created,
-			updated: issue.fields.updated,
+			fields: {
+				summary: issue.fields.summary,
+				description: issue.fields.description,
+				status: {
+					name: issue.fields.status.name,
+				},
+				created: issue.fields.created,
+				updated: issue.fields.updated,
+			},
 		}));
 	} catch (error) {
 		console.error("Error fetching issues:", error);
@@ -323,7 +335,7 @@ export const watchIssue = async (issueKey: string): Promise<void> => {
 };
 
 export async function updateIssue(issueKey: string, updates: object) {
-	const response = await jiraApi.put(`/rest/api/3/issue/${issueKey}`, updates);
+	const response = await jiraApi.put(`/api/proxy/rest/api/3/issue/${issueKey}`, updates);
 	return response.data;
 }
 

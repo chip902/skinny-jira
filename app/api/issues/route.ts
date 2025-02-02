@@ -6,21 +6,15 @@ import { fetchIssues, getAvailableTransitions, transitionIssue, updateIssue } fr
 export async function GET() {
 	try {
 		const issues = await fetchIssues();
-		return NextResponse.json({
-			success: true,
-			data: issues,
-			total: issues.length,
+		return new Response(JSON.stringify(issues), {
+			headers: { "Content-Type": "application/json" },
 		});
 	} catch (error) {
-		console.error("Error fetching JIRA issues:", error);
-		return NextResponse.json(
-			{
-				success: false,
-				error: "Failed to fetch issues from JIRA",
-				details: axios.isAxiosError(error) ? error.message : String(error),
-			},
-			{ status: 500 }
-		);
+		console.error("Failed to fetch issues:", error);
+		return new Response(JSON.stringify({ error: "Failed to fetch issues" }), {
+			status: 500,
+			headers: { "Content-Type": "application/json" },
+		});
 	}
 }
 
