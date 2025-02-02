@@ -51,7 +51,18 @@ export interface JiraIssue {
 		summary: string;
 		description?: JiraDescriptionPayload;
 		status: {
+			self: string;
+			description: string;
+			iconUrl: string;
 			name: string;
+			id: string;
+			statusCategory: {
+				self: string;
+				id: number;
+				key: string;
+				colorName: string;
+				name: string;
+			};
 		};
 		created: string;
 		updated: string;
@@ -75,9 +86,16 @@ export interface JiraDescriptionPayload {
 }
 
 export interface JiraAssignee {
+	self: string;
 	accountId: string;
-	displayName: string;
 	emailAddress: string;
+	avatarUrls: {
+		[key: string]: string;
+	};
+	displayName: string;
+	active: boolean;
+	timeZone: string;
+	accountType: string;
 }
 
 export interface IssueResponse {

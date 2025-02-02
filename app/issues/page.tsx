@@ -7,6 +7,7 @@ import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
 	fetchIssues,
 	getAvailableTransitions,
@@ -21,6 +22,7 @@ import {
 } from "@/lib/jira-api";
 import { JiraIssue } from "@/types/jira";
 import { Skeleton } from "@/components/ui/skeleton";
+import RenderDescription from "@/components/RenderDescription";
 
 function DateDisplay({ isoString }: { isoString: string }) {
 	const [formatted, setFormatted] = useState("");
@@ -44,12 +46,8 @@ export default function IssueManagement() {
 
 	useEffect(() => {
 		async function onMount() {
-			// init JIRA
 			initializeJiraApi(process.env.NEXT_PUBLIC_JIRA_EMAIL!, process.env.NEXT_PUBLIC_JIRA_TOKEN!);
-
-			// test query
 			await testJqlQuery('project = "TADTECHJC"');
-			// then load issues
 			await loadIssues();
 		}
 
@@ -64,7 +62,7 @@ export default function IssueManagement() {
 	const loadIssues = async () => {
 		try {
 			setLoading(true);
-			setError(""); // Clear any previous errors
+			setError("");
 			const fetchedIssues = await fetchIssues();
 			setIssues(fetchedIssues);
 		} catch (error: any) {
@@ -100,9 +98,7 @@ export default function IssueManagement() {
 						comment: details.fields.comment,
 						summary: details.fields.summary,
 						description: details.fields.description,
-						status: {
-							name: details.status?.name || "Not Available",
-						},
+						status: details.fields.status,
 						created: details.fields.created,
 						updated: details.fields.updated,
 					},
@@ -122,15 +118,30 @@ export default function IssueManagement() {
 		if (!selectedIssue) return;
 
 		try {
-			setLoading(true);
-			await transitionIssue(selectedIssue.key, transitionId);
+			setDetailsLoading(true);
+			const response = await fetch(`/api/issues/${selectedIssue.key}/transitions`, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({
+					transitionId,
+				}),
+			});
+
+			if (!response.ok) {
+				const error = await response.json();
+				throw new Error(error.error || "Failed to transition issue");
+			}
+
+			// Refresh the issue details and list after transition
 			await loadIssueDetails();
-			await loadIssues(); // Refresh the full list
+			await loadIssues();
 		} catch (error) {
-			setError("Failed to transition issue");
+			setError(error instanceof Error ? error.message : "Failed to transition issue");
 			console.error("Error transitioning issue:", error);
 		} finally {
-			setLoading(false);
+			setDetailsLoading(false);
 		}
 	};
 
@@ -138,7 +149,7 @@ export default function IssueManagement() {
 		if (!selectedIssue || !newComment.trim()) return;
 
 		try {
-			setLoading(true);
+			setDetailsLoading(true);
 			await addComment(selectedIssue.key, newComment);
 			setNewComment("");
 			await loadIssueDetails();
@@ -146,7 +157,7 @@ export default function IssueManagement() {
 			setError("Failed to add comment");
 			console.error("Error adding comment:", error);
 		} finally {
-			setLoading(false);
+			setDetailsLoading(false);
 		}
 	};
 
@@ -203,9 +214,8 @@ export default function IssueManagement() {
 						<CardHeader>
 							<CardTitle>Issue Details: {selectedIssue.key}</CardTitle>
 						</CardHeader>
-						<CardContent>
+						<CardContent className="sticky">
 							{detailsLoading ? (
-								// Skeleton loading state
 								<div className="space-y-6">
 									<div>
 										<Skeleton className="h-6 w-[100px] mb-2" />
@@ -229,25 +239,28 @@ export default function IssueManagement() {
 									</div>
 								</div>
 							) : (
-								// Actual content
 								<div className="space-y-6">
 									<div>
-										<h3 className="text-lg font-semibold mb-2">Status: {}</h3>
+										<h3 className="text-lg font-semibold mb-2">Status: {selectedIssue?.fields?.status?.name}</h3>
 										{transitions.length > 0 && (
 											<div className="flex gap-2">
-												{transitions.map((transition) => (
-													<Button
-														key={transition.id}
-														variant="outline"
-														onClick={() => handleTransition(transition.id)}
-														disabled={loading}>
-														{transition.name}
-													</Button>
-												))}
+												<Select onValueChange={handleTransition}>
+													<SelectTrigger>
+														<SelectValue placeholder="Change status..." />
+													</SelectTrigger>
+													<SelectContent>
+														<SelectGroup>
+															{transitions.map((transition) => (
+																<SelectItem key={transition.id} value={transition.id.toString()}>
+																	{transition.name}
+																</SelectItem>
+															))}
+														</SelectGroup>
+													</SelectContent>
+												</Select>
 											</div>
 										)}
 									</div>
-
 									<div>
 										<h3 className="text-lg font-semibold mb-2">Summary</h3>
 										<p className="text-sm text-muted-foreground">{selectedIssue?.fields?.summary}</p>
@@ -257,6 +270,16 @@ export default function IssueManagement() {
 										<p className="text-sm text-muted-foreground">{selectedIssue.fields?.assignee?.displayName}</p>
 									</div>
 									<div>
+										<h3 className="text-lg font-semibold mb-2">Description</h3>
+										<div className="text-sm text-muted-foreground">
+											{selectedIssue?.fields?.description ? (
+												<RenderDescription content={selectedIssue.fields.description.content} />
+											) : (
+												"No description available"
+											)}
+										</div>
+									</div>
+									<div>
 										<h3 className="text-lg font-semibold mb-2">Created</h3>
 										<p className="text-sm text-muted-foreground">
 											{selectedIssue.fields?.created
@@ -264,7 +287,6 @@ export default function IssueManagement() {
 												: "N/A"}
 										</p>
 									</div>
-
 									<div>
 										<h3 className="text-lg font-semibold mb-2">Updated</h3>
 										<p className="text-sm text-muted-foreground">
@@ -279,9 +301,9 @@ export default function IssueManagement() {
 											{comments.map((comment) => (
 												<div key={comment.id} className="border-l-2 border-primary/20 pl-4">
 													<p className="text-sm text-muted-foreground">
-														{comment.author.displayName} - {format(new Date(comment.created), "yyyy-MM-dd HH:mm:ss")}
+														{comment?.author.displayName} - {format(new Date(comment?.created), "yyyy-MM-dd HH:mm:ss")}
 													</p>
-													<p className="mt-1">{comment.body.content[0].content[0].text}</p>
+													<p className="mt-1">{comment?.body.content[0].content[0].text}</p>
 												</div>
 											))}
 										</div>

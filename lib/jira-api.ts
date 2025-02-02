@@ -8,10 +8,16 @@ interface CustomAxiosHeaders extends AxiosHeaders {
 
 const jiraApi: AxiosInstance = axios.create({
 	baseURL: "/",
+	withCredentials: true,
+	headers: {
+		"X-Requested-With": "XMLHttpRequest",
+		"X-XSRF-TOKEN": "true",
+	},
 });
 
 (jiraApi.defaults.headers as unknown) = {
 	"X-Requested-With": "XMLHttpRequest",
+	"X-XSRF-TOKEN": "true",
 } as unknown as CustomAxiosHeaders;
 
 export const setJiraAuthHeader = (apiToken: string) => {
@@ -64,6 +70,10 @@ export const testConnection = async () => {
 export const initializeJiraApi = (email: string, apiToken: string) => {
 	const base64Credentials = btoa(`${email}:${apiToken}`);
 	jiraApi.defaults.headers["Authorization"] = `Basic ${base64Credentials}`;
+	jiraApi.defaults.headers["Accept"] = "application/json";
+	jiraApi.defaults.headers["Content-Type"] = "application/json";
+	jiraApi.defaults.headers["X-XSRF-TOKEN"] = "true";
+	jiraApi.defaults.withCredentials = true;
 
 	// Log the headers (without showing the full token)
 	console.log("JIRA API initialized with headers:", {
@@ -193,8 +203,8 @@ export const fetchIssues = async (): Promise<any[]> => {
 	try {
 		const response = await jiraApi.get<IssueResponse>("/api/proxy/rest/api/3/search", {
 			params: {
-				jql: "project = TADTECHJC ORDER BY created DESC",
-				fields: "summary,description,status,created,updated",
+				jql: "project = TADTECHJC and assignee = 'Andrew Chepurny' ORDER BY created DESC",
+				fields: "summary,description,status,created,updated,comment,assignee",
 			},
 		});
 		console.log("Jira API Response:", response); // Log the raw response
@@ -237,7 +247,7 @@ export const getAvailableTransitions = async (issueKey: string): Promise<Workflo
 // Function to transition an issue
 export const transitionIssue = async (issueKey: string, transitionId: string): Promise<void> => {
 	try {
-		await jiraApi.post(`/api/proxy/rest/api/3/issue/${issueKey}/transitions`, {
+		await jiraApi.post(`/api/issues/${issueKey}/transitions`, {
 			transition: { id: transitionId },
 		});
 	} catch (error) {
@@ -249,25 +259,34 @@ export const transitionIssue = async (issueKey: string, transitionId: string): P
 // Function to add a comment to an issue
 export const addComment = async (issueKey: string, comment: string): Promise<JiraComment> => {
 	try {
-		// Log the request details (for debugging)
 		console.log("Adding comment to issue:", issueKey);
-		console.log("Current headers:", {
-			...jiraApi.defaults.headers,
-			Authorization: "Basic [hidden]",
-		});
+		console.log("Comment body:", comment);
+		// Log headers (without sensitive info)
+		console.log("Request URL:", `/api/issues/${issueKey}/comments`);
 
-		const response = await jiraApi.post(`/api/proxy/rest/api/3/issue/${issueKey}/comment`, {
-			body: {
-				type: "doc",
-				version: 1,
-				content: [
-					{
-						type: "paragraph",
-						content: [{ type: "text", text: comment }],
-					},
-				],
+		const response = await jiraApi.post(
+			`/api/issues/${issueKey}/comments`,
+			{
+				body: {
+					type: "doc",
+					version: 1,
+					content: [
+						{
+							type: "paragraph",
+							content: [{ type: "text", text: comment }],
+						},
+					],
+				},
 			},
-		});
+			{
+				headers: {
+					Accept: "application/json",
+					"Content-Type": "application/json",
+					"X-XSRF-TOKEN": "true",
+					"X-Requested-With": "XMLHttpRequest",
+				},
+			}
+		);
 
 		return response.data;
 	} catch (error) {
@@ -276,10 +295,10 @@ export const addComment = async (issueKey: string, comment: string): Promise<Jir
 			console.error("Response status:", error.response?.status);
 			console.error("Response data:", error.response?.data);
 			console.error("Request URL:", error.config?.url);
-			console.error("Request headers:", {
-				...error.config?.headers,
-				Authorization: "Basic [hidden]",
-			});
+			// Log the actual error message from JIRA if available
+			if (error.response?.data?.errorMessages) {
+				console.error("JIRA Error Messages:", error.response.data.errorMessages);
+			}
 		}
 		throw error;
 	}
