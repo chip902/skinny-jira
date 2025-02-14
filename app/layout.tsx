@@ -2,10 +2,14 @@
 
 import "./globals.css";
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Roboto } from "next/font/google";
 import ThemeProvider from "../components/theme-provider";
+import ClientLayout from "./ClientLayout";
 
-const inter = Inter({ subsets: ["latin"] });
+const roboto = Roboto({
+	subsets: ["latin"],
+	weight: "500",
+});
 
 export const metadata: Metadata = {
 	title: "JIRA Client App",
@@ -15,8 +19,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
 	return (
 		<html suppressHydrationWarning={true}>
-			<body className={inter.className}>
-				<ThemeProvider>{children}</ThemeProvider>
+			<body className={roboto.className}>
+				<ThemeProvider>
+					<ClientLayout>{children}</ClientLayout>
+				</ThemeProvider>
 			</body>
 		</html>
 	);

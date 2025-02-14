@@ -162,7 +162,7 @@ export default function IssueManagement() {
 	};
 
 	return (
-		<div className="container mx-auto p-4">
+		<div>
 			<h1 className="text-3xl font-bold mb-6">Issue Management</h1>
 
 			<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -214,7 +214,7 @@ export default function IssueManagement() {
 						<CardHeader>
 							<CardTitle>Issue Details: {selectedIssue.key}</CardTitle>
 						</CardHeader>
-						<CardContent className="sticky">
+						<CardContent className="sticky top-0">
 							{detailsLoading ? (
 								<div className="space-y-6">
 									<div>
