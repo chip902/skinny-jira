@@ -49,6 +49,9 @@ export interface JiraIssue {
 		assignee: JiraAssignee;
 		comment: JiraComment[];
 		summary: string;
+		priority: {
+			name: string;
+		};
 		description?: JiraDescriptionPayload;
 		status: {
 			self: string;
@@ -70,7 +73,7 @@ export interface JiraIssue {
 }
 
 export interface JiraTextElement {
-	type: "text";
+	type: "text" | string;
 	text: string;
 }
 

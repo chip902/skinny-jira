@@ -9,3 +9,14 @@ export interface Issue {
 	summary: string;
 	description: string;
 }
+
+export interface Role {
+	name: string;
+	permissions: string[];
+}
+
+export interface RouteSegmentProps {
+	params: {
+		issueKey: string;
+	};
+}

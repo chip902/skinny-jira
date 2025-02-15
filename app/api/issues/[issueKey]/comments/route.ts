@@ -1,10 +1,11 @@
 // app/api/issues/[issueKey]/comments/route.ts
+import { RouteSegmentProps } from "@/types";
 import { NextRequest, NextResponse } from "next/server";
 
-export async function POST(req: NextRequest, { params }: { params: { issueKey: string } }) {
+export async function POST(request: NextRequest, { params }: RouteSegmentProps) {
 	try {
-		const body = await req.json();
-		const { issueKey } = await params;
+		const body = await request.json();
+		const { issueKey } = params;
 
 		const modifiedBody = {
 			...body,

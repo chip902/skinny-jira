@@ -2,7 +2,7 @@ import type { Config } from "tailwindcss";
 
 const config: Config = {
 	darkMode: ["class"],
-	content: ["./pages/**/*.{js,ts,jsx,tsx,mdx}", "./components/**/*.{js,ts,jsx,tsx,mdx}", "./app/**/*.{js,ts,jsx,tsx,mdx}"],
+	content: ["./pages/**/*.{js,ts,jsx,tsx}", "./components/**/*.{js,ts,jsx,tsx}", "./app/**/*.{js,ts,jsx,tsx}"],
 	theme: {
 		extend: {
 			backgroundImage: {
@@ -77,6 +77,14 @@ const config: Config = {
 			animation: {
 				"accordion-down": "accordion-down 0.2s ease-out",
 				"accordion-up": "accordion-up 0.2s ease-out",
+			},
+			spacing: {
+				container: "w-full mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl",
+				gap: "gap-4",
+				"page-top": "145px",
+			},
+			fontFamily: {
+				sans: ["Inter", "system-ui", "-apple-system", "Segoe UI", "Helvetica Neue", "Arial"],
 			},
 		},
 	},
