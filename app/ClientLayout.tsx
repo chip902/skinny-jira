@@ -1,26 +1,39 @@
 "use client";
 import { useSession, SessionProvider } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
+import { Navigation } from "@/components/Navigation";
 
 function ClientLayoutContent({ children }: { children: React.ReactNode }) {
 	const router = useRouter();
+	const pathname = usePathname();
 	const { data: session, status } = useSession();
 
 	useEffect(() => {
-		if (!session?.user?.role) {
-			router.push("/");
-		}
-	}, [router, session]);
+		if (status === "loading") return;
 
-	useEffect(() => {
-		if (status === "unauthenticated") {
+		if (status === "unauthenticated" && pathname !== "/") {
 			router.push("/");
 		}
-	}, [router, status]);
+
+		if (status === "authenticated" && pathname === "/") {
+			router.push("/issues");
+		}
+	}, [status, router, pathname]);
+
+	// Show loading state
+	if (status === "loading") {
+		return (
+			<div className="flex items-center justify-center min-h-screen">
+				<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+			</div>
+		);
+	}
+
 	return (
-		<div className="app-container">
-			<main className="content-container">{children}</main>
+		<div className="min-h-screen bg-background">
+			<Navigation />
+			<main className="container mx-auto py-6">{children}</main>
 		</div>
 	);
 }

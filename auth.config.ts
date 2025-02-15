@@ -1,16 +1,23 @@
+// auth.config.ts
 import NextAuth, { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { otpStore, sendOTP, verifyOTP } from "@/services/authService";
+import { sendOTP, verifyOTP, checkIsRegistered, verifyPassword, setPassword } from "@/services/authService";
+
+const APPROVED_DOMAINS = ["wu.com", "performics.com", "westernunion.com", "chepurny.com"];
 
 export const authOptions: NextAuthOptions = {
 	providers: [
 		CredentialsProvider({
 			id: "credentials",
-			name: "Email & OTP",
+			name: "Email & Password",
 			credentials: {
 				email: {
 					label: "Email",
 					type: "email",
+				},
+				password: {
+					label: "Password",
+					type: "password",
 				},
 				otp: {
 					label: "OTP",
@@ -19,6 +26,9 @@ export const authOptions: NextAuthOptions = {
 				step: {
 					type: "hidden",
 				},
+				authType: {
+					type: "hidden", // 'login', 'register', or 'reset'
+				},
 			},
 			async authorize(credentials) {
 				try {
@@ -26,60 +36,81 @@ export const authOptions: NextAuthOptions = {
 						throw new Error("Email is required");
 					}
 
-					if (credentials?.step === "request-otp") {
-						// First step: Send OTP
-						const otp = await sendOTP(credentials.email);
-
-						// Store OTP in your otpStore
-						otpStore.push({
-							code: otp,
-							createdAt: Date.now(),
-							email: credentials.email,
-						});
-
-						throw new Error("OTP_SENT");
-					}
-
-					// Second step: Verify OTP
-					if (!credentials?.otp) {
-						throw new Error("OTP is required");
-					}
-
-					const isValid = await verifyOTP(credentials.otp);
-					if (!isValid) {
-						throw new Error("Invalid OTP");
-					}
-
-					// Check approved domains
-					const approvedDomains = ["wu.com", "performics.com", "westernunion.com, chepurny.com"];
+					// Check domain before proceeding
 					const emailDomain = credentials.email.split("@")[1];
-					if (!approvedDomains.includes(emailDomain)) {
+					if (!APPROVED_DOMAINS.includes(emailDomain)) {
 						throw new Error("Unauthorized domain");
 					}
 
-					// Return the user object
-					return {
-						id: credentials.email,
-						email: credentials.email,
-						role: "user",
-					};
+					const isRegistered = await checkIsRegistered(credentials.email);
+
+					// Handle OTP request
+					if (credentials?.step === "request-otp") {
+						await sendOTP(credentials.email);
+						throw new Error("OTP_SENT");
+					}
+
+					// Handle login with password
+					if (credentials?.authType === "login" && credentials?.password) {
+						if (!isRegistered) {
+							throw new Error("ACCOUNT_NOT_REGISTERED");
+						}
+
+						const isValid = await verifyPassword(credentials.email, credentials.password);
+						if (!isValid) {
+							throw new Error("Invalid password");
+						}
+
+						return {
+							id: credentials.email,
+							email: credentials.email,
+							role: "user",
+						};
+					}
+
+					// Handle OTP verification
+					if (credentials?.otp) {
+						const isValid = await verifyOTP(credentials.otp, credentials.email);
+						if (!isValid) {
+							throw new Error("Invalid OTP");
+						}
+
+						// If this is a registration or reset, we'll handle password setting in the frontend
+						if (credentials.authType === "register" || credentials.authType === "reset") {
+							throw new Error("OTP_VERIFIED");
+						}
+
+						return {
+							id: credentials.email,
+							email: credentials.email,
+							role: "user",
+						};
+					}
+
+					throw new Error("Invalid credentials");
 				} catch (error) {
-					console.error("Authentication failed:", error);
-					return null;
+					console.error("Authentication error:", error);
+					throw error;
 				}
 			},
 		}),
 	],
+	session: {
+		strategy: "jwt",
+		maxAge: 30 * 24 * 60 * 60, // 30 days
+	},
 	callbacks: {
 		async jwt({ token, user }) {
 			if (user) {
 				token.role = user.role;
+				token.email = user.email;
 			}
 			return token;
 		},
 		async session({ session, token }) {
 			if (session.user) {
 				session.user.role = token.role as string;
+				session.user.email = token.email as string;
 			}
 			return session;
 		},
@@ -88,10 +119,7 @@ export const authOptions: NextAuthOptions = {
 		signIn: "/",
 		error: "/error",
 	},
-	session: {
-		strategy: "jwt",
-		maxAge: 30 * 24 * 60 * 60, // 30 days
-	},
+	debug: process.env.NODE_ENV === "development",
 };
 
 export default NextAuth(authOptions);
