@@ -1,9 +1,9 @@
 // auth.config.ts
 import NextAuth, { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { sendOTP, verifyOTP, checkIsRegistered, verifyPassword, setPassword } from "@/services/authService";
+import { sendOTP, verifyOTP, checkIsRegistered, verifyPassword } from "@/services/authService";
 
-const APPROVED_DOMAINS = ["wu.com", "performics.com", "westernunion.com", "chepurny.com", "publicis.com", "publicismedia.com", "performics.com"];
+const APPROVED_DOMAINS = ["test.com", "foobar.com"];
 
 export const authOptions: NextAuthOptions = {
 	providers: [
