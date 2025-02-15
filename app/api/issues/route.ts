@@ -1,7 +1,7 @@
 // app/api/issues/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import axios from "axios";
-import { fetchIssues, getAvailableTransitions, transitionIssue, updateIssue } from "@/lib/jira-api";
+import { createIssueV3, fetchIssues, getAvailableTransitions, transitionIssue, updateIssue } from "@/lib/jira-api";
 
 export async function GET() {
 	try {
@@ -18,43 +18,60 @@ export async function GET() {
 	}
 }
 
-export async function POST(req: NextRequest, { params }: { params: { ticketKey: string } }) {
+export async function POST(req: NextRequest) {
 	try {
-		const { transitionId } = await req.json();
+		const body = await req.json();
 
-		if (!params?.ticketKey || !transitionId) {
-			return NextResponse.json(
-				{
-					success: false,
-					error: "Missing required parameters",
-				},
-				{ status: 400 }
-			);
+		// If we have a ticketKey, we're transitioning an existing issue
+		if (body.ticketKey && body.transitionId) {
+			const availableTransitions = await getAvailableTransitions(body.ticketKey);
+
+			if (!availableTransitions.includes(body.transitionId)) {
+				return NextResponse.json(
+					{
+						success: false,
+						error: "Invalid transition ID",
+					},
+					{ status: 400 }
+				);
+			}
+
+			const result = await transitionIssue(body.ticketKey, body.transitionId);
+			return NextResponse.json({
+				success: true,
+				data: result,
+			});
 		}
 
-		const availableTransitions = await getAvailableTransitions(params.ticketKey);
+		// If we don't have a ticketKey, we're creating a new issue
+		if (body.summary && body.description) {
+			const result = await createIssueV3({
+				summary: body.summary,
+				description: body.description,
+				issueType: body.issueType,
+				priority: body.priority,
+				assignee: body.assignee,
+			});
 
-		if (!availableTransitions.includes(transitionId)) {
-			return NextResponse.json(
-				{
-					success: false,
-					error: "Invalid transition ID",
-				},
-				{ status: 400 }
-			);
+			return NextResponse.json({
+				success: true,
+				data: result,
+			});
 		}
 
-		const result = await transitionIssue(params.ticketKey, transitionId);
-		return NextResponse.json({
-			success: true,
-			data: result,
-		});
-	} catch (error) {
-		console.error("Error transitioning JIRA issue:", error);
 		return NextResponse.json(
 			{
 				success: false,
-				error: "Failed to transition JIRA issue",
+				error: "Invalid request parameters",
+			},
+			{ status: 400 }
+		);
+	} catch (error) {
+		console.error("Error handling JIRA issue:", error);
+		return NextResponse.json(
+			{
+				success: false,
+				error: "Failed to process JIRA issue",
 				details: axios.isAxiosError(error) ? error.message : String(error),
 			},
 			{ status: 500 }

@@ -123,3 +123,12 @@ export interface PublicTicket {
 	updated: string;
 	comments: JiraComment[];
 }
+
+export interface CreateIssueParams {
+	projectKey?: string;
+	summary: string;
+	description: string;
+	issueType?: string;
+	priority?: string;
+	assignee?: string;
+}

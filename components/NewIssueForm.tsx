@@ -8,6 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { handleApiResponse } from "@/lib/utils";
+import { toast } from "@/hooks/use-toast";
+import { ToastMessage } from "./ui/toast-messages";
 
 export function NewIssueForm() {
 	const router = useRouter();
@@ -17,31 +20,35 @@ export function NewIssueForm() {
 	const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
 		setLoading(true);
-		setError("");
-
-		const formData = new FormData(e.currentTarget);
-		const data = {
-			summary: formData.get("summary"),
-			description: formData.get("description"),
-		};
 
 		try {
+			const formData = new FormData(e.currentTarget);
 			const response = await fetch("/api/issues", {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
 				},
-				body: JSON.stringify(data),
+				body: JSON.stringify({
+					summary: formData.get("summary"),
+					description: formData.get("description"),
+				}),
 			});
 
-			if (!response.ok) {
-				throw new Error("Failed to create issue");
-			}
+			const data = await handleApiResponse(response);
 
-			router.push("/issues");
-			router.refresh();
+			if (data.success) {
+				toast({
+					variant: "default",
+					children: ToastMessage({
+						title: "Issue Created",
+						description: "Your issue has been successfully created.",
+					}),
+				});
+				// Handle success (e.g., redirect or clear form)
+			}
 		} catch (error) {
-			setError(error instanceof Error ? error.message : "Something went wrong");
+			// Error toast is already shown by handleApiResponse
+			console.error("Form submission error:", error);
 		} finally {
 			setLoading(false);
 		}

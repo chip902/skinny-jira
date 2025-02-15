@@ -1,5 +1,5 @@
 // lib/jira-api.ts
-import { IssueResponse, JiraComment, JiraProject, ProjectResponse, PublicTicket, WorkflowTransition } from "@/types/jira";
+import { CreateIssueParams, IssueResponse, JiraComment, JiraProject, ProjectResponse, PublicTicket, WorkflowTransition } from "@/types/jira";
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosHeaders, AxiosResponse } from "axios";
 
 interface CustomAxiosHeaders extends AxiosHeaders {
@@ -30,6 +30,69 @@ export const setJiraAuthHeader = (apiToken: string) => {
 export const removeJiraAuthHeader = () => {
 	delete jiraApi.defaults.headers.Authorization;
 };
+
+export async function createIssueV2(data: {
+	summary: string;
+	description: string;
+	issueType?: string; // e.g., "Task", "Bug", "Story"
+	priority?: string;
+	assignee?: string;
+}) {
+	const { summary, description, issueType = "Task", priority = "Medium", assignee } = data;
+
+	try {
+		const response = await fetch(`/api/proxy/rest/api/2/issue`, {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+			},
+			body: JSON.stringify({
+				fields: {
+					project: {
+						key: process.env.NEXT_PUBLIC_JIRA_PROJECT_KEY,
+					},
+					summary,
+					description: {
+						type: "doc",
+						version: 1,
+						content: [
+							{
+								type: "paragraph",
+								content: [
+									{
+										text: description,
+										type: "text",
+									},
+								],
+							},
+						],
+					},
+					issuetype: {
+						name: issueType,
+					},
+					priority: {
+						name: priority,
+					},
+					...(assignee && {
+						assignee: {
+							name: assignee,
+						},
+					}),
+				},
+			}),
+		});
+
+		if (!response.ok) {
+			const error = await response.json();
+			throw new Error(error.message || "Failed to create issue");
+		}
+
+		return await response.json();
+	} catch (error) {
+		console.error("Error creating JIRA issue:", error);
+		throw error;
+	}
+}
 
 const requestHandler = async (config: AxiosRequestConfig) => {
 	if (!jiraApi.defaults.headers.Authorization) {
@@ -141,7 +204,14 @@ export const listProjects = async (): Promise<void> => {
 };
 
 // Function to create a new issue
-export const createIssue = async (projectKey: string, summary: string, description: string): Promise<IssueResponse> => {
+export const createIssueV3 = async ({
+	projectKey,
+	summary,
+	description,
+	issueType = "Story",
+	priority,
+	assignee,
+}: CreateIssueParams): Promise<IssueResponse> => {
 	try {
 		const response = await jiraApi.post(`/api/proxy/rest/api/3/issue`, {
 			fields: {
@@ -151,8 +221,18 @@ export const createIssue = async (projectKey: string, summary: string, descripti
 				summary,
 				description,
 				issuetype: {
-					name: "Story",
+					name: issueType,
 				},
+				...(priority && {
+					priority: {
+						name: priority,
+					},
+				}),
+				...(assignee && {
+					assignee: {
+						id: assignee,
+					},
+				}),
 			},
 		});
 		return response.data;
@@ -161,7 +241,6 @@ export const createIssue = async (projectKey: string, summary: string, descripti
 		throw error;
 	}
 };
-
 // Test JQL query directly
 // In jira-api.ts
 export const testJqlQuery = async (jql: string): Promise<any> => {
