@@ -3,7 +3,7 @@ import NextAuth, { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { sendOTP, verifyOTP, checkIsRegistered, verifyPassword, setPassword } from "@/services/authService";
 
-const APPROVED_DOMAINS = ["wu.com", "performics.com", "westernunion.com", "chepurny.com"];
+const APPROVED_DOMAINS = ["wu.com", "performics.com", "westernunion.com", "chepurny.com", "publicis.com", "publicismedia.com", "performics.com"];
 
 export const authOptions: NextAuthOptions = {
 	providers: [
@@ -27,7 +27,7 @@ export const authOptions: NextAuthOptions = {
 					type: "hidden",
 				},
 				authType: {
-					type: "hidden", // 'login', 'register', or 'reset'
+					type: "hidden",
 				},
 			},
 			async authorize(credentials) {
@@ -39,7 +39,7 @@ export const authOptions: NextAuthOptions = {
 					// Check domain before proceeding
 					const emailDomain = credentials.email.split("@")[1];
 					if (!APPROVED_DOMAINS.includes(emailDomain)) {
-						throw new Error("Unauthorized domain");
+						throw new Error("Your email domain is not authorized.");
 					}
 
 					const isRegistered = await checkIsRegistered(credentials.email);
