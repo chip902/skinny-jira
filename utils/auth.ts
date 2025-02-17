@@ -20,3 +20,11 @@ export async function verifyOTP(email: string, otp: string): Promise<boolean> {
 		throw new Error("Failed to verify OTP");
 	}
 }
+
+export function debounce<T extends (...args: any[]) => any>(func: T, wait: number): (...args: Parameters<T>) => void {
+	let timeout: NodeJS.Timeout;
+	return (...args: Parameters<T>) => {
+		clearTimeout(timeout);
+		timeout = setTimeout(() => func(...args), wait);
+	};
+}
